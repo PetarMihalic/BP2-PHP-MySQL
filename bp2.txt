@@ -1,0 +1,279 @@
+1. Jedna knjiga se može nalaziti u više knjižnica, u jednoj knjižnici može se nalaziti više knjiga.       (knjiga, knjižnica, inventar)
+2. Jedan autor je napisao više knjiga, jedna knjiga je napisana od jednog ili više autora.                (autor, knjiga, napisao)
+3. Jedna kategorija sadrži više knjiga, jedna knjiga se nalazi u jednog kategoriji.                       (kategorija, knjiga)
+4. Jedna knjižnica ima više članova, jedan član može biti učlanjen u više knjižnica.                      (knjižnica, član, učlanjen)
+5. Jedan član može posuditi više knjiga, jedna knjiga biti može posuđena od strane više članova.          (član, knjiga, podudba)
+6. Jedna knjiga može imati jedan status, jedan status može imati više knjiga.                             (status, knjiga)
+7. Jedna knjižnica može imati više zaposlenika, jedan zaposlenik može raditi u jednoj knjižnici.          (knjižnica, zaposlenik)
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+Neki upiti:
+
+Ime i prezime autra za nazivom knjige:
+
+select a.ime, a.prezime, k.naziv_knjige 
+from autor a
+inner join napisao n on a.autor_id = n.autor_id 
+inner join knjiga k on n.isbn = k.isbn;
+
+Nedostupne knjige:
+
+select i.fizicka_knjiga_id, i.knjiznica_id, i.isbn , k.naziv_knjige, s.status_knjige
+from status s
+inner join inventar i on s.status_id = i.status_id
+inner join knjiga k on i.isbn = k.isbn 
+where i.status_id = 2;
+
+Clanovi sa pripadajucim posudbama:
+
+select concat(c.ime, ' ', c.prezime) as Ime_i_prezime, i.fizicka_knjiga_id as Inventarni_broj, k.naziv_knjige, p.vrijedi_do
+from knjiga k
+inner join inventar i on k.isbn = i.isbn 
+inner join posudba p on i.fizicka_knjiga_id = p.fizicka_knjiga_id 
+inner join clan c on p.clan_id = c.clan_id
+order by 4;
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+Triggeri:
+
+1. trigger: Provjerava je li knjiga dostupna i nije li clan vec posudio tri knjige što je maksimalno dozvoljeno, 
+ako je dostupna i ako clan može posuditi onda se u inventaru mijenja status knjige na posuđena i u tablicu posuđena se unaša redak
+
+DELIMITER $$
+create trigger provjera_i_posudba
+before insert 
+on posudba
+for each row 
+begin 
+	declare dostupnost int;
+	declare kolicina int;
+	select status_id
+		into dostupnost
+		from inventar
+		where fizicka_knjiga_id = new.fizicka_knjiga_id;
+	select count(fizicka_knjiga_id)
+		into kolicina
+		from posudba
+		where clan_id = new.clan_id;
+	if dostupnost <> 1 then 
+		signal sqlstate '45000' set message_text = 'Nažalost knjiga nije dostupna';
+	elseif kolicina = 3 then 
+		signal sqlstate '45000' set message_text = 'Posudili ste makisamalni dopušteni broj knjiga (3)';
+	else
+		update inventar 
+		set status_id = 2
+		where fizicka_knjiga_id = new.fizicka_knjiga_id;
+	end if;
+end
+$$
+DELIMITER ;
+
+2. trigger: Kod vraćanja knjige se briše redak iz tablice posudba te trigger služi da se u inventaru vraćena knjiga vodi kao dostupna
+
+DELIMITER $$
+create trigger vracanje_knjige
+after delete 
+on posudba
+for each row 
+begin 
+	update inventar 
+	set status_id = 1
+	where fizicka_knjiga_id = old.fizicka_knjiga_id;
+end
+$$
+DELIMITER ;
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+insert into kategorija (kategorija_id, naziv_kategorije) values (1, 'Dramski roman');
+insert into kategorija (kategorija_id, naziv_kategorije) values (2, 'Enciklopedistika');
+insert into kategorija (kategorija_id, naziv_kategorije) values (3, 'Fantastika');
+insert into kategorija (kategorija_id, naziv_kategorije) values (4, 'Humoristični roman');
+insert into kategorija (kategorija_id, naziv_kategorije) values (5, 'Kriminalistički roman');
+insert into kategorija (kategorija_id, naziv_kategorije) values (6, 'Putopis');
+insert into kategorija (kategorija_id, naziv_kategorije) values (7, 'Znanstvena fantastika');
+insert into kategorija (kategorija_id, naziv_kategorije) values (8, 'Poezija');
+
+select * from kategorija;
+
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (1, 'Rat i mir', 'Globus media', '1869.', 1);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (2, 'Ubiti pticu rugalicu', 'Šareni dućan', '2014.', 1);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (3, 'Enciklopedija životinja', 'Školska knjiga', '2016.', 2);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (4, 'Harry Potter i Kamen mudraca', 'Algoritam', '1997.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (5, 'Harry Potter i Odaja tajni', 'Algoritam', '1998.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (6, 'Harry Potter i Zatočenik Azkabana', 'Algoritam', '1999.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (7, 'Harry Potter i Plameni Pehar', 'Algoritam', '2003.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (8, 'Harry Potter i Red feniksa', 'Algoritam', '2003.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (9, 'Harry Potter i Princ miješane krvi', 'Algoritam', '2003.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (10, 'Harry Potter i Darovi smrti', 'Algoritam', '2003.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (11, 'Kvaka 22', 'Šareni dućan', '1961.', 4);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (12, 'Tajna kanarinčeve krletke', 'Vedis', '2018.', 5);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (13, 'Četiri pokojna šerifa', 'V.D.T.', '2008.', 5);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (14, 'U divljini', 'V. B. Z.', '2008.', 6);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (15, 'Rat svijetova', 'Zagrebačka naklada', '2005.', 7);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (16, 'Sluškinjina priča', 'Lumen', '2017.', 7);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (17, 'Gospoda Glembajevi', 'Mozaik knjiga', '2015.', 1);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (18, 'Pjesma leda i vatre 1, Igra prijestolja', 'Lumen', '2018.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (19, 'Pjesma leda i vatre 2, Sraz kraljeva', 'Lumen', '2018.', 3);
+insert into knjiga (isbn, naziv_knjige, nakladnik, godina_izdanja, kategorija_id) values (20, 'Pjesma leda i vatre 3, Oluja mačeva', 'Lumen', '2018.', 3);
+
+select * from knjiga;
+
+insert into autor (autor_id, ime, prezime) values (1, 'Lav', 'Nikolajevič Tolstoj');
+insert into autor (autor_id, ime, prezime) values (2, 'Nelle', 'Harper Lee');
+insert into autor (autor_id, ime, prezime) values (3, 'Philip', 'Whitfield');
+insert into autor (autor_id, ime, prezime) values (4, 'Joanne', 'Rowling');
+insert into autor (autor_id, ime, prezime) values (5, 'Joseph', 'Heller');
+insert into autor (autor_id, ime, prezime) values (6, 'Milan', 'Nikolić');
+insert into autor (autor_id, ime, prezime) values (7, 'Jon', 'Krakauer');
+insert into autor (autor_id, ime, prezime) values (8, 'Herbert', 'Wells');
+insert into autor (autor_id, ime, prezime) values (9, 'Margaret', 'Atwood');
+insert into autor (autor_id, ime, prezime) values (10, 'Miroslav', 'Krleža');
+insert into autor (autor_id, ime, prezime) values (11, 'George', 'R.R. Martin');
+
+select * from autor;
+
+insert into napisao (isbn, autor_id) values (1, 1);
+insert into napisao (isbn, autor_id) values (2, 2);
+insert into napisao (isbn, autor_id) values (3, 3);
+insert into napisao (isbn, autor_id) values (4, 4);
+insert into napisao (isbn, autor_id) values (5, 4);
+insert into napisao (isbn, autor_id) values (6, 4);
+insert into napisao (isbn, autor_id) values (7, 4);
+insert into napisao (isbn, autor_id) values (8, 4);
+insert into napisao (isbn, autor_id) values (9, 4);
+insert into napisao (isbn, autor_id) values (10, 4);
+insert into napisao (isbn, autor_id) values (11, 5);
+insert into napisao (isbn, autor_id) values (12, 6);
+insert into napisao (isbn, autor_id) values (13, 6);
+insert into napisao (isbn, autor_id) values (14, 7);
+insert into napisao (isbn, autor_id) values (15, 8);
+insert into napisao (isbn, autor_id) values (16, 9);
+insert into napisao (isbn, autor_id) values (17, 10);
+insert into napisao (isbn, autor_id) values (18, 11);
+insert into napisao (isbn, autor_id) values (19, 11);
+insert into napisao (isbn, autor_id) values (20, 11);
+
+select * from napisao;
+
+select a.ime, a.prezime, k.naziv_knjige 
+from autor a
+inner join napisao n on a.autor_id = n.autor_id 
+inner join knjiga k on n.isbn = k.isbn;
+
+insert into knjiznica (knjiznica_id, naziv_knjiznice, adresa, broj_telefona) values (1, 'Gradska knjižnica "Metel Ožegović"', 'Trg slobode 8A, 42000 Varaždin', '042 212 767');
+insert into knjiznica (knjiznica_id, naziv_knjiznice, adresa, broj_telefona) values (2, 'Gradska knjižnica Zagreb', 'Trg Ante Starčevića 6, 10000, Zagreb', '01 4572 084');
+
+select * from knjiznica;
+
+insert into zaposlenik (zaposlenik_id, ime, prezime, adresa, broj_telefona, knjiznica_id) values (1, 'Ana', 'Anić', 'Zagrebačka 15, 42000 Varaždin', '095 312 4589', 1);
+insert into zaposlenik (zaposlenik_id, ime, prezime, adresa, broj_telefona, knjiznica_id) values (2, 'Branko', 'Branić', 'Varaždinska 3, 42000 Varaždin', '091 123 4567', 1);
+insert into zaposlenik (zaposlenik_id, ime, prezime, adresa, broj_telefona, knjiznica_id) values (3, 'Dario', 'Darić', 'Varaždinska 120, 42000 Varaždin', '092 546 8926', 1);
+insert into zaposlenik (zaposlenik_id, ime, prezime, adresa, broj_telefona, knjiznica_id) values (4, 'Filip', 'Filipović', 'Ul. Vilka Novaka 5 , 42000 Varaždin', '095 345 1358', 1);
+
+select * from zaposlenik;
+
+insert into clan (clan_id, ime, prezime, adresa, broj_telefona) values (1, 'Ivan', 'Ivić', 'Zagrebačka 14, 42000 Varaždin', '042 123 456');
+insert into clan (clan_id, ime, prezime, adresa, broj_telefona) values (2, 'Luka', 'Lukić', 'Zagrebačka 29, 42000 Varaždin', '042 234 567');
+insert into clan (clan_id, ime, prezime, adresa, broj_telefona) values (3, 'Sara', 'Sarić', 'Varaždinska 32, 42000 Varaždin', '042 345 678');
+insert into clan (clan_id, ime, prezime, adresa, broj_telefona) values (4, 'Klara', 'Klarić', 'Varaždinska 99, 42000 Varaždin', '042 456 789');
+insert into clan (clan_id, ime, prezime, adresa, broj_telefona) values (5, 'Tomo', 'Tomić', 'Ul. Ruđera Boškovića 61, 42000 Varaždin', '042 567 891');
+
+select * from clan;
+
+insert into uclanjen (clan_id, knjiznica_id, vrijedi_od, vrijedi_do) values (1, 1, '2020-08-15', '2021-08-15');
+insert into uclanjen (clan_id, knjiznica_id, vrijedi_od, vrijedi_do) values (2, 1, '2020-03-16', '2021-03-16');
+insert into uclanjen (clan_id, knjiznica_id, vrijedi_od, vrijedi_do) values (3, 1, '2020-09-28', '2021-09-28');
+insert into uclanjen (clan_id, knjiznica_id, vrijedi_od, vrijedi_do) values (4, 1, '2020-10-30', '2021-10-30');
+insert into uclanjen (clan_id, knjiznica_id, vrijedi_od, vrijedi_do) values (5, 1, '2020-12-24', '2021-12-24');
+
+select * from uclanjen;
+
+insert into status (status_id, status_knjige) values (1, 'dostupno');
+insert into status (status_id, status_knjige) values (2, 'posuđeno');
+insert into status (status_id, status_knjige) values (3, 'izgubljeno');
+
+select * from status;
+
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 1, 1, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 2, 1, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 3, 1, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 4, 1, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 5, 1, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 6, 2, 3);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 7, 2, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 8, 2, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 9, 3, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 10, 3, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 11, 3, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 12, 3, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 13, 4, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 14, 4, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 15, 4, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 16, 4, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 17, 5, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 18, 5, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 19, 5, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 20, 6, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 21, 6, 3);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 22, 6, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 23, 7, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 24, 7, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 25, 7, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 26, 8, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 27, 8, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 28, 8, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 29, 9, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 30, 9, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 31, 9, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 32, 10, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 33, 10, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 34, 10, 3);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 35, 11, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 36, 12, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 37, 12, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 38, 12, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 39, 12, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 40, 12, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 41, 13, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 42, 13, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 43, 13, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 44, 13, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 45, 14, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 46, 14, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 47, 15, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 48, 15, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 49, 16, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 50, 16, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 51, 16, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 52, 17, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 53, 17, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 54, 17, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 55, 17, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 56, 18, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 57, 18, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 58, 19, 2);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 59, 19, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 60, 19, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 61, 19, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 62, 20, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (2, 63, 20, 1);
+insert into inventar (knjiznica_id, fizicka_knjiga_id, isbn, status_id) values (1, 64, 20, 1);
+
+select * from inventar;
+
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (1, 2, '2021-01-01','2021-02-01', 1, 1);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (1, 3, '2021-01-01','2021-02-01', 1, 1);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (5, 5, '2021-01-02','2021-02-02', 1, 1);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (2, 14, '2020-12-15','2021-01-15', 1, 4);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (3, 26, '2020-12-10','2021-01-10', 1, 8);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (4, 33, '2020-12-08','2021-01-08', 1, 10);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (4, 40, '2021-01-10','2021-02-10', 1, 12);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (2, 41, '2020-12-10','2021-10-10', 1, 13);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (5, 42, '2020-12-03','2021-12-03', 1, 13);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (5, 55, '2020-12-03','2021-12-03', 1, 17);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (3, 57, '2020-10-01','2021-02-01', 1, 18);
+insert into posudba (clan_id, fizicka_knjiga_id, vrijedi_od, vrijedi_do, knjiznica_id, isbn) values (1, 58, '2021-01-01','2021-02-01', 1, 19);
+
+select * from posudba;
